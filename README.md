@@ -1,8 +1,8 @@
-<h1> <img src="https://raw.githubusercontent.com/SonicSpeedrunning/LiveSplit.SonicColors/main/Logo.png" alt="SonicColorsUltimate" height="75" align="middle" /> Sonic Colors: Ultimate - Autosplitter</h1>
+<h1> <img src="https://raw.githubusercontent.com/SonicSpeedrunning/LiveSplit.SonicColors/master/Logo.png" alt="SonicColorsUltimate" height="75" align="middle" /> Sonic Colors: Ultimate - Autosplitter</h1>
 
 Autosplitter for the PC version of Sonic Colors: Ultimate with full support for all accepted categories on speedrun.com and customizable options
 
-<img src="https://raw.githubusercontent.com/SonicSpeedrunning/LiveSplit.SonicColors/main/settings.png">
+<img src="https://raw.githubusercontent.com/SonicSpeedrunning/LiveSplit.SonicColors/master/settings.png">
 
 # General behaviour
 
