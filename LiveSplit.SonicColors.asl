@@ -162,10 +162,9 @@ startup
     vars.RunStartStatus.CleanSave = 35;
     vars.RunStartStatus.SavedFile = 110;
 
-    vars.Ranks = new ExpandoObject();
-    vars.Ranks.NotRanked = -1;
-
+    vars.RankNotRanked = -1;
     vars.InvalidLevelID = "none";
+    vars.LevelIdentifier = "stg";
 }
 
 update
@@ -174,9 +173,9 @@ update
     vars.watchers.UpdateAll(game);
 
     // Convert some game data into more easily readable formats and manage some quirks in game memory
-    current.GoalRingReached = (vars.watchers["goalRingReached_byte"].Current & (1 << 5)) != 0;
-    current.LevelID = vars.watchers["levelID_numeric"].Current == 0 ? vars.InvalidLevelID : vars.watchers["levelID"].Current;
-    current.IGT = vars.watchers["levelID_numeric"].Current == 8 || vars.watchers["levelID_numeric"].Current == 0 ? TimeSpan.Zero : TimeSpan.FromSeconds(Math.Truncate(vars.watchers["igt"].Current * 100) / 100);
+    current.LevelID = vars.watchers["levelID_numeric"].Current == 0 || !vars.watchers["levelID"].Current.Contains(vars.LevelIdentifier) ? vars.InvalidLevelID : vars.watchers["levelID"].Current;
+    current.GoalRingReached = current.LevelID == vars.InvalidLevelID ? false : (vars.watchers["goalRingReached_byte"].Current & (1 << 5)) != 0;
+    current.IGT = current.LevelID == vars.InvalidLevelID ? TimeSpan.Zero : TimeSpan.FromSeconds(Math.Truncate(vars.watchers["igt"].Current * 100) / 100);
 
     // if the timer is not running (eg. a run has been reset) these variables need to be reset
     if (timer.CurrentPhase == TimerPhase.NotRunning)
@@ -197,7 +196,7 @@ start
         return settings["eggShuttle"] && current.LevelID == vars.Acts[0] && old.LevelID == vars.InvalidLevelID;
     } else {
         return
-            (settings["cleanSave"] && vars.watchers["RunStart"].Old == vars.RunStartStatus.CleanSave && vars.watchers["RunStart"].Current == vars.RunStartStatus.SavedFile && vars.watchers["TR1rank"].Current == vars.Ranks.NotRanked)
+            (settings["cleanSave"] && vars.watchers["RunStart"].Old == vars.RunStartStatus.CleanSave && vars.watchers["RunStart"].Current == vars.RunStartStatus.SavedFile && vars.watchers["TR1rank"].Current == vars.RankNotRanked)
             || (settings["sonicSim"] && current.LevelID == vars.Acts[45] && old.LevelID == vars.InvalidLevelID);
     }
 }
@@ -249,7 +248,7 @@ split
         if (old.LevelID == vars.Acts[44])
             return settings[old.LevelID] && current.GoalRingReached && !old.GoalRingReached;
         else
-            if (!current.GoalRingReached && old.GoalRingReached)
+            if (!current.GoalRingReached && old.GoalRingReached && current.LevelID == vars.InvalidLevelID)
                 return checkSplit();
     }
 }
