@@ -1,7 +1,7 @@
 // Sonic Colors: Ultimate
 // Autosplitter and IGT timer
 // Coding: Jujstme
-// Version 3.0 (Apr 18th, 2022)
+// Version 3.1 (Apr 22nd, 2022)
 // Sonic Colors speedrunning discord: https://discord.gg/QjWTShBhh8
 
 state ("Sonic Colors - Ultimate"){}
