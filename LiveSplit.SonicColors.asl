@@ -1,47 +1,103 @@
+// Sonic Colors
 // Sonic Colors: Ultimate
 // Autosplitter and IGT timer
 // Coding: Jujstme
-// Version 3.1 (Apr 22nd, 2022)
+// Version 4.0 (May 15th, 2022)
 // Sonic Colors speedrunning discord: https://discord.gg/QjWTShBhh8
 
-state ("Sonic Colors - Ultimate"){}
+state("Sonic Colors - Ultimate"){}
+state("Dolphin"){}
 
 init
 {
-    // The game is 64-bit only
-    if (!game.Is64Bit())
-        throw new Exception("Hooked process is not 64bit. Hooked the wrong game process or unsupported game version.");
-    
+    vars.UsesBigEndian = false;
+
     // Initializing the main variables we need for sigscanning
+    vars.watchers = new MemoryWatcherList();
     IntPtr ptr = IntPtr.Zero;
     Action checkptr = () => { if (ptr == IntPtr.Zero) throw new NullReferenceException(); };
-    vars.watchers = new MemoryWatcherList();
     var scanner = new SignatureScanner(game, modules.First().BaseAddress, modules.First().ModuleMemorySize);
 
-    // Check if the exe internally has the string "Sonic Colors: Ultimate"
-    // If it does not, then the game is not Sonic Colors. The script will then throw an Exception.
-    ptr = scanner.Scan(new SigScanTarget(9, "0F 84 ???????? 48 8D 05 ???????? 4C 89 B4 24") { OnFound = (p, s, addr) => addr + 0x4 + p.ReadValue<int>(addr) });
-    checkptr();
-    if (memory.ReadString(ptr, 25) != "Sonic Colors: Ultimate")
-        throw new Exception();
+    switch (game.ProcessName.ToLower())
+    {
+        case "sonic colors - ultimate":
+            vars.DebugPrint("  => Game version identified: Sonic Colors Ultimate");
+            version = "PC (Ultimate)";
 
-    // Level data pointers
-    // This memory region contains all the data about the current level you're in, such as IGT, rings, score, etc. Also has a lot of flags (inside bitmasks) I didn't bother to investigate.
-    // Also contains data about the current Egg Shuttle run, though the corresponding pointer is accessible only if you're inside Egg Shuttle.
-    ptr = scanner.Scan(new SigScanTarget(5, "76 0C 48 8B 0D") { OnFound = (p, s, addr) => addr + 0x4 + p.ReadValue<int>(addr) }); checkptr();
-    vars.watchers.Add(new StringWatcher(new DeepPointer(ptr, 0x8, 0x38, 0x60, 0xE0), 6) { Name = "levelID" });                                                                                     // It's a 6-character ID that uniquely reports the level you're in. The IDs are the same as in the Wii version of the game. Check Wii's actstgmission.lua for details
-    vars.watchers.Add(new MemoryWatcher<byte>(new DeepPointer(ptr, 0x8, 0x38, 0x60, 0xE0)) { Name = "levelID_numeric", FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull });                 // Same as above, but deals with the fact that the StringWatcher doesn't have a working ReadFailAction
-    vars.watchers.Add(new MemoryWatcher<float>(new DeepPointer(ptr, 0x8, 0x38, 0x60, 0x270)) { Name = "igt", FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull });                           // Pretty self-explanatory. It's the internal level timer. Will be garbage numbers outside levels but this is dealth with in the "update" method
-    vars.watchers.Add(new MemoryWatcher<byte>(new DeepPointer(ptr, 0x8, 0x38, 0x60, 0x110)) { Name = "goalRingReached_byte", FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull });           // Bit 5 gets flipped the moment the stage is reported by the game as complete and all in-level events are stopped (including IGT)
-    vars.watchers.Add(new MemoryWatcher<byte>(new DeepPointer(ptr, 0x8, 0x38, 0x68, 0x110, 0x0)) { Name = "EggShuttle_TotalStages", FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull });    // This value is always above 0 if the pointer is accessible, so it can be used to report whether you're in egg shuttle or not
-    vars.watchers.Add(new MemoryWatcher<byte>(new DeepPointer(ptr, 0x8, 0x38, 0x68, 0x110, 0xB8)) { Name = "EggShuttle_ProgressiveID", FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull }); // Indicates level progression inside Egg Shuttle. Goes from 0 to 44 (44 = Terminal Velocity Act 2). It techically also goes to 45 at the final results screen after Terminal Velocity Act
-    vars.watchers.Add(new MemoryWatcher<byte> (new DeepPointer(ptr, 0x8, 0x8, 0x10, 0x60, 0x120)) { Name = "RunStart", FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull });                 // Corresponds to the name assigned to the internal savefile (it's leftover data from the Wii version). New game = "########"; Otherwise = "no-name"
-    vars.watchers.Add(new MemoryWatcher<sbyte>(new DeepPointer(ptr, 0x8, 0x8, 0x10, 0x60, 0x1CC)) { Name = "TR1rank",  FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull });                 // It's the rank for Tropical Resort Act 1. 0xFF (or -1 as a sbyte) means the level has not been completed yet (eg. new game)
+            // The game is 64-bit only
+            if (!game.Is64Bit()) throw new Exception("Hooked process is not 64bit. Hooked the wrong game process or unsupported game version.");
+            
+            // Check if the exe internally has the string "Sonic Colors: Ultimate"
+            // If it does not, then the game is not Sonic Colors. The script will then throw an Exception.
+            vars.DebugPrint("  => Initializing sigscan");
+            ptr = scanner.Scan(new SigScanTarget(9, "0F 84 ???????? 48 8D 05 ???????? 4C 89 B4 24") { OnFound = (p, s, addr) => addr + 0x4 + p.ReadValue<int>(addr) });
+            checkptr();
+            if (memory.ReadString(ptr, 25) != "Sonic Colors: Ultimate")
+                throw new Exception();
+
+            // Level data pointers
+            // This memory region contains all the data about the current level you're in, such as IGT, rings, score, etc. Also has a lot of flags (inside bitmasks) I didn't bother to investigate.
+            // Also contains data about the current Egg Shuttle run, though the corresponding pointer is accessible only if you're inside Egg Shuttle.
+
+            ptr = scanner.Scan(new SigScanTarget(5, "76 0C 48 8B 0D") { OnFound = (p, s, addr) => addr + 0x4 + p.ReadValue<int>(addr) });
+            checkptr();
+            vars.DebugPrint("    => Done");
+            vars.DebugPrint("  => Setting up MemoryWatchers...");
+            vars.watchers.Add(new StringWatcher(new DeepPointer(ptr, 0x8, 0x38, 0x60, 0xE0), 6) { Name = "levelID" });                                                                                     // It's a 6-character ID that uniquely reports the level you're in. The IDs are the same as in the Wii version of the game. Check Wii's actstgmission.lua for details
+            vars.watchers.Add(new MemoryWatcher<byte>(new DeepPointer(ptr, 0x8, 0x38, 0x60, 0xE0)) { Name = "levelID_numeric", FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull });                 // Same as above, but deals with the fact that the StringWatcher doesn't have a working ReadFailAction
+            vars.watchers.Add(new MemoryWatcher<float>(new DeepPointer(ptr, 0x8, 0x38, 0x60, 0x270)) { Name = "igt", FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull });                           // Pretty self-explanatory. It's the internal level timer. Will be garbage numbers outside levels but this is dealth with in the "update" method
+            vars.watchers.Add(new MemoryWatcher<byte>(new DeepPointer(ptr, 0x8, 0x38, 0x60, 0x110)) { Name = "goalRingReached_byte", FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull });           // Bit 5 gets flipped the moment the stage is reported by the game as complete and all in-level events are stopped (including IGT)
+            vars.watchers.Add(new MemoryWatcher<byte>(new DeepPointer(ptr, 0x8, 0x38, 0x68, 0x110, 0x0)) { Name = "EggShuttle_TotalStages", FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull });    // This value is always above 0 if the pointer is accessible, so it can be used to report whether you're in egg shuttle or not
+            vars.watchers.Add(new MemoryWatcher<byte>(new DeepPointer(ptr, 0x8, 0x38, 0x68, 0x110, 0xB8)) { Name = "EggShuttle_ProgressiveID", FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull }); // Indicates level progression inside Egg Shuttle. Goes from 0 to 44 (44 = Terminal Velocity Act 2). It techically also goes to 45 at the final results screen after Terminal Velocity Act
+            vars.watchers.Add(new MemoryWatcher<byte> (new DeepPointer(ptr, 0x8, 0x8, 0x10, 0x60, 0x120)) { Name = "RunStart", FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull });                 // Corresponds to the name assigned to the internal savefile (it's leftover data from the Wii version). New game = "########"; Otherwise = "no-name"
+            vars.watchers.Add(new MemoryWatcher<sbyte>(new DeepPointer(ptr, 0x8, 0x8, 0x10, 0x60, 0x1CC)) { Name = "TR1rank",  FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull });                 // It's the rank for Tropical Resort Act 1. 0xFF (or -1 as a sbyte) means the level has not been completed yet (eg. new game)
+            vars.DebugPrint("    => Done");
+        break;
+
+        case "dolphin":
+            vars.DebugPrint("  => Game version identified: Sonic Colors (Wii - Dolphin)");
+            version = "Wii - Dolphin";
+
+            // Gamecube uses Big Endian
+            vars.UsesBigEndian = true;
+
+            vars.DebugPrint("  => Locating base RAM address (MEM2)...");
+            // Stealing the method used by Dolphin memory engine (https://github.com/aldelaro5/Dolphin-memory-engine) to locate the RAM base address
+            ptr = game.MemoryPages(true).FirstOrDefault(p => p.Type == MemPageType.MEM_MAPPED && p.State == MemPageState.MEM_COMMIT && (int)p.RegionSize == 0x4000000).BaseAddress;
+            checkptr();
+            vars.DebugPrint("  => MEM2 address found at 0x" + ptr.ToString("X"));
+
+            vars.DebugPrint("  => Setting up MemoryWatchers...");
+            vars.watchers.Add(new StringWatcher(ptr + 0xAB7064, 6) { Name = "levelID" });
+            vars.watchers.Add(new MemoryWatcher<byte>(ptr + 0xAB7064) { Name = "levelID_numeric" });
+            vars.watchers.Add(new MemoryWatcher<float>(ptr + 0xAB7170) { Name = "igt" });
+            vars.watchers.Add(new MemoryWatcher<byte>(ptr + 0xAB7087) { Name = "goalRingReached_byte" });
+
+            // Additional memory addresses because, for some reason, Egg Shuttle shifts everything by 0x360 bytes
+            vars.watchers.Add(new StringWatcher(ptr + 0xAB7064 + 0x360, 6) { Name = "levelID_360" });
+            vars.watchers.Add(new MemoryWatcher<byte>(ptr + 0xAB7064 + 0x360) { Name = "levelID_numeric_360" });
+            vars.watchers.Add(new MemoryWatcher<float>(ptr + 0xAB7170 + 0x360) { Name = "igt_360" });
+            vars.watchers.Add(new MemoryWatcher<byte>(ptr + 0xAB7087 + 0x360) { Name = "goalRingReached_byte_360" });
+
+            vars.watchers.Add(new MemoryWatcher<byte>(ptr + 0xAB6FE3) { Name = "EggShuttle_TotalStages" });
+            vars.watchers.Add(new MemoryWatcher<byte>(ptr + 0xAB709B) { Name = "EggShuttle_ProgressiveID" });
+
+            // Setting "Enabled = false" because those are dummy MemoryWatchers.
+            vars.watchers.Add(new MemoryWatcher<byte> (IntPtr.Zero) { Name = "RunStart", Enabled = false });
+            vars.watchers.Add(new MemoryWatcher<sbyte>(IntPtr.Zero) { Name = "TR1rank", Enabled = false });
+
+            vars.DebugPrint("    => Done");
+        break;
+    }
 
     // Default values
+    vars.DebugPrint("  => Setting up default values...");
     current.IGT = TimeSpan.Zero;
     current.LevelID = vars.InvalidLevelID;
     current.GoalRingReached = false;
+    vars.DebugPrint("    => Done");
+
+    vars.DebugPrint("  => Init script completed");
 }
 
 startup
@@ -152,7 +208,7 @@ startup
     };
     for (int i = 0; i < Settings.GetLength(0); i++)
         settings.Add(Settings[i, 0], true, Settings[i, 1], Settings[i, 2]);
-
+    
     // Default variables
     vars.AccumulatedIGT = TimeSpan.Zero;
     vars.IsEggShuttle = false;
@@ -165,12 +221,44 @@ startup
     vars.RankNotRanked = -1;
     vars.InvalidLevelID = "none";
     vars.LevelIdentifier = "stg";
+
+    // Custom functions - actually used only to convert the IGT (float)
+    vars.ToLittleEndian = (Func<float, float>)(input => {
+        byte[] temp = BitConverter.GetBytes(input);
+        Array.Reverse(temp);
+        return BitConverter.ToSingle(temp, 0);
+    });
+
+    // Debug functions
+    var debug = true; // Easy flag to quickly enable and disable debug outputs. When they're not needed anymore all it takes is to set this to false.
+    vars.DebugPrint = (Action<string>)((string obj) => { if (debug) print("[Sonic Colors] " + obj); });
+    vars.resetOffsetTrigger = false;
 }
 
 update
 {
     // Update the watchers
     vars.watchers.UpdateAll(game);
+
+    // Ugly hack for dealing with the timer offset on the Wii version
+    if (vars.resetOffsetTrigger)
+    {
+        timer.Run.Offset = TimeSpan.Zero;
+        vars.resetOffsetTrigger = false;
+    }
+
+    // Special fixes for the Wii version of the game
+    if (vars.UsesBigEndian)
+    {
+        if (vars.watchers["EggShuttle_TotalStages"].Current > 0 && vars.watchers["EggShuttle_TotalStages"].Current <= 45)
+        {
+            vars.watchers["levelID"].Current = vars.watchers["levelID_360"].Current;
+            vars.watchers["levelID_numeric"].Current = vars.watchers["levelID_numeric_360"].Current;
+            vars.watchers["igt"].Current = vars.watchers["igt_360"].Current;
+            vars.watchers["goalRingReached_byte"].Current = vars.watchers["goalRingReached_byte_360"].Current;
+        }
+        vars.watchers["igt"].Current = vars.ToLittleEndian(vars.watchers["igt"].Current);
+    }
 
     // Convert some game data into more easily readable formats and manage some quirks in game memory
     current.LevelID = vars.watchers["levelID_numeric"].Current == 0 || !vars.watchers["levelID"].Current.Contains(vars.LevelIdentifier) ? vars.InvalidLevelID : vars.watchers["levelID"].Current;
@@ -181,7 +269,7 @@ update
     if (timer.CurrentPhase == TimerPhase.NotRunning)
     {
         vars.AccumulatedIGT = TimeSpan.Zero;
-        vars.IsEggShuttle = vars.watchers["EggShuttle_TotalStages"].Current > 0;
+        vars.IsEggShuttle = vars.watchers["EggShuttle_TotalStages"].Current > 0 && vars.watchers["EggShuttle_TotalStages"].Current <= 45;
     }
 
     // Accumulate the time if the IGT resets
@@ -193,11 +281,30 @@ start
 {
     if (vars.IsEggShuttle)
     {
-        return settings["eggShuttle"] && current.LevelID == vars.Acts[0] && old.LevelID == vars.InvalidLevelID;
+        if (settings["eggShuttle"])
+        {
+            return (!vars.UsesBigEndian && current.LevelID == vars.Acts[0] && old.LevelID == vars.InvalidLevelID) // Used in the PC version
+                || (vars.UsesBigEndian && current.LevelID == vars.Acts[0] && current.IGT == TimeSpan.Zero && !old.GoalRingReached); // Used on the Wii version
+        }
     } else {
-        return
-            (settings["cleanSave"] && vars.watchers["RunStart"].Old == vars.RunStartStatus.CleanSave && vars.watchers["RunStart"].Current == vars.RunStartStatus.SavedFile && vars.watchers["TR1rank"].Current == vars.RankNotRanked)
-            || (settings["sonicSim"] && current.LevelID == vars.Acts[45] && old.LevelID == vars.InvalidLevelID);
+        if (settings["cleanSave"])
+        {
+            if (vars.UsesBigEndian)
+            {
+                if (old.LevelID == vars.InvalidLevelID && current.LevelID == vars.Acts[0])
+                {
+                    timer.Run.Offset = TimeSpan.FromSeconds(1);
+                    vars.resetOffsetTrigger = true;
+                    return true;
+                }
+            } else {
+                return vars.watchers["TR1rank"].Current == vars.RankNotRanked && vars.watchers["RunStart"].Old == vars.RunStartStatus.CleanSave && vars.watchers["RunStart"].Current == vars.RunStartStatus.SavedFile; // Used on the PC version
+            }
+        }
+        else if (settings["sonicSim"])
+        {
+            return current.LevelID == vars.Acts[45] && old.LevelID == vars.InvalidLevelID;
+        }
     }
 }
 
@@ -205,11 +312,11 @@ reset
 {
     if (vars.IsEggShuttle)
     {
-        return
-            settings["restarteggShuttle"] &&
-            old.IGT != TimeSpan.Zero &&
-            current.IGT == TimeSpan.Zero &&
-            !old.GoalRingReached;
+        if (settings["restarteggShuttle"] && old.IGT != TimeSpan.Zero && current.IGT == TimeSpan.Zero && !old.GoalRingReached)
+        {
+            vars.AccumulatedIGT = TimeSpan.Zero;
+            return true;
+        }
     } else {
         return
             settings["resetSave"] &&
@@ -248,7 +355,7 @@ split
         if (old.LevelID == vars.Acts[44])
             return settings[old.LevelID] && current.GoalRingReached && !old.GoalRingReached;
         else
-            if (!current.GoalRingReached && old.GoalRingReached && current.LevelID == vars.InvalidLevelID)
+            if (!current.GoalRingReached && old.GoalRingReached && current.LevelID != old.LevelID)
                 return checkSplit();
     }
 }
