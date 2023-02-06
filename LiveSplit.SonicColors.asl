@@ -5,6 +5,7 @@
 // Version 4.0 (May 15th, 2022)
 // Sonic Colors speedrunning discord: https://discord.gg/QjWTShBhh8
 
+state("SonicColorsUltimate"){}
 state("Sonic Colors - Ultimate"){}
 state("Dolphin"){}
 
@@ -21,19 +22,14 @@ init
     switch (game.ProcessName.ToLower())
     {
         case "sonic colors - ultimate":
+        case "soniccolorsultimate":
             vars.DebugPrint("  => Game version identified: Sonic Colors Ultimate");
             version = "PC (Ultimate)";
 
             // The game is 64-bit only
             if (!game.Is64Bit()) throw new Exception("Hooked process is not 64bit. Hooked the wrong game process or unsupported game version.");
             
-            // Check if the exe internally has the string "Sonic Colors: Ultimate"
-            // If it does not, then the game is not Sonic Colors. The script will then throw an Exception.
             vars.DebugPrint("  => Initializing sigscan");
-            ptr = scanner.Scan(new SigScanTarget(9, "0F 84 ???????? 48 8D 05 ???????? 4C 89 B4 24") { OnFound = (p, s, addr) => addr + 0x4 + p.ReadValue<int>(addr) });
-            checkptr();
-            if (memory.ReadString(ptr, 25) != "Sonic Colors: Ultimate")
-                throw new Exception();
 
             // Level data pointers
             // This memory region contains all the data about the current level you're in, such as IGT, rings, score, etc. Also has a lot of flags (inside bitmasks) I didn't bother to investigate.
