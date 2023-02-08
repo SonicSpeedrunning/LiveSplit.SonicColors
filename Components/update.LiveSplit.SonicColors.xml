@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <updates>
+	<update version="1.2.0.0">
+		<files>
+			<file path="Components/LiveSplit.SonicColors.dll" status="changed" />
+		</files>
+		<changelog>
+			<change>Complete code overhaul</change>
+			<change>Full support for both Sonic Colors (through Dolphin) and Sonic Colors: Ultimate</change>
+		</changelog>
+	</update>
 	<update version="1.1.0.0">
 		<files>
 			<file path="Components/LiveSplit.SonicColors.dll" status="changed" />

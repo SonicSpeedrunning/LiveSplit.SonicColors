@@ -1,0 +1,85 @@
+﻿namespace LiveSplit.SonicColors
+{
+    enum GameVersion
+    {
+        PC,
+        Emulator
+    }
+
+    enum GameMode
+    {
+        AnyPercent,
+        EggShuttle
+    }
+
+    enum LevelID
+    {
+        TropicalResortAct1,
+        TropicalResortAct2,
+        TropicalResortAct3,
+        TropicalResortAct4,
+        TropicalResortAct5,
+        TropicalResortAct6,
+        TropicalResortBoss,
+        SweetMountainAct1,
+        SweetMountainAct2,
+        SweetMountainAct3,
+        SweetMountainAct4,
+        SweetMountainAct5,
+        SweetMountainAct6,
+        SweetMountainBoss,
+        StarlightCarnivalAct1,
+        StarlightCarnivalAct2,
+        StarlightCarnivalAct3,
+        StarlightCarnivalAct4,
+        StarlightCarnivalAct5,
+        StarlightCarnivalAct6,
+        StarlightCarnivalBoss,
+        PlanetWispAct1,
+        PlanetWispAct2,
+        PlanetWispAct3,
+        PlanetWispAct4,
+        PlanetWispAct5,
+        PlanetWispAct6,
+        PlanetWispBoss,
+        AquariumParkAct1,
+        AquariumParkAct2,
+        AquariumParkAct3,
+        AquariumParkAct4,
+        AquariumParkAct5,
+        AquariumParkAct6,
+        AquariumParkBoss,
+        AsteroidCoasterAct1,
+        AsteroidCoasterAct2,
+        AsteroidCoasterAct3,
+        AsteroidCoasterAct4,
+        AsteroidCoasterAct5,
+        AsteroidCoasterAct6,
+        AsteroidCoasterBoss,
+        TerminalVelocityAct1,
+        TerminalVelocityBoss,
+        TerminalVelocityAct2,
+        SonicSimulatorAct1_1,
+        SonicSimulatorAct1_2,
+        SonicSimulatorAct1_3,
+        SonicSimulatorAct2_1,
+        SonicSimulatorAct2_2,
+        SonicSimulatorAct2_3,
+        SonicSimulatorAct3_1,
+        SonicSimulatorAct3_2,
+        SonicSimulatorAct3_3,
+        SonicSimulatorAct4_1,
+        SonicSimulatorAct4_2,
+        SonicSimulatorAct4_3,
+        SonicSimulatorAct5_1,
+        SonicSimulatorAct5_2,
+        SonicSimulatorAct5_3,
+        SonicSimulatorAct6_1,
+        SonicSimulatorAct6_2,
+        SonicSimulatorAct6_3,
+        SonicSimulatorAct7_1,
+        SonicSimulatorAct7_2,
+        SonicSimulatorAct7_3,
+        None,
+    }
+}

@@ -1,177 +1,200 @@
 ﻿using System;
-using System.Diagnostics;
-using System.Linq;
-using System.Reflection;
+using System.Collections.Generic;
+using System.Windows.Forms;
 using LiveSplit.ComponentUtil;
+using LiveSplit.Model;
 
 namespace LiveSplit.SonicColors
 {
-    class Watchers : MemoryWatcherList
+    partial class Watchers
     {
-        // Game process
-        private readonly Process game;
-        public bool IsGameHooked => game != null && !game.HasExited;
+        // Game version
+        private readonly LiveSplitState state;
+        public GameVersion Version { get; protected set; } = GameVersion.PC;
+        public Wii emu_help { get; protected set; } = null;
 
-        // Imported game data
-        public MemoryWatcher<byte> RunStart { get; }
-        public MemoryWatcher<sbyte> TR1rank { get; }
-        private MemoryWatcher<float> igt { get; }
-        private MemoryWatcher<byte> goalRingReached_byte { get; }
-        private StringWatcher levelID { get; }
-        private MemoryWatcher<byte> levelID_numeric { get; }
-        public MemoryWatcher<byte> EggShuttle_TotalStages { get; }
-        public MemoryWatcher<byte> EggShuttle_ProgressiveID { get; }
-
-        // Fake MemoryWatchers: used to convert game data into more easily readable formats and to manage some quirks in game memory
-        public FakeMemoryWatcher<bool> GoalRingReached => new FakeMemoryWatcher<bool>((this.goalRingReached_byte.Old & (1 << 5)) != 0, (this.goalRingReached_byte.Current & (1 << 5)) != 0);
-        public FakeMemoryWatcher<string> LevelID => new FakeMemoryWatcher<string>(this.levelID_numeric.Old == 0 ? "none" : this.levelID.Old, this.levelID_numeric.Current == 0 ? Levels.None : this.levelID.Current);
-        public FakeMemoryWatcher<double> IGT => new FakeMemoryWatcher<double>(this.levelID_numeric.Old == 8 || this.levelID_numeric.Old == 0 ? 0 : Math.Truncate(this.igt.Old * 100) / 100,
-            this.levelID_numeric.Current == 8 || this.levelID_numeric.Current == 0 ? 0 : Math.Truncate(this.igt.Current * 100) / 100);
-
-        // Useful functions and internal variables
-        public bool IGThasReset => this.IGT.Old != 0 && this.IGT.Current == 0;
-        public double AccumulatedIGT = 0d;
-        public bool IsEggShuttle = false;
-
-
-        public Watchers()
+        private readonly Dictionary<string, LevelID> ActsDict = new()
         {
-            foreach (string process in new string[] { "Sonic Colors - Ultimate" })
+            { "stg110", SonicColors.LevelID.TropicalResortAct1 },
+            { "stg130", SonicColors.LevelID.TropicalResortAct2 },
+            { "stg120", SonicColors.LevelID.TropicalResortAct3 },
+            { "stg140", SonicColors.LevelID.TropicalResortAct4 },
+            { "stg150", SonicColors.LevelID.TropicalResortAct5 },
+            { "stg160", SonicColors.LevelID.TropicalResortAct6 },
+            { "stg190", SonicColors.LevelID.TropicalResortBoss },
+            { "stg210", SonicColors.LevelID.SweetMountainAct1 },
+            { "stg230", SonicColors.LevelID.SweetMountainAct2 },
+            { "stg220", SonicColors.LevelID.SweetMountainAct3 },
+            { "stg260", SonicColors.LevelID.SweetMountainAct4 },
+            { "stg240", SonicColors.LevelID.SweetMountainAct5 },
+            { "stg250", SonicColors.LevelID.SweetMountainAct6 },
+            { "stg290", SonicColors.LevelID.SweetMountainBoss },
+            { "stg310", SonicColors.LevelID.StarlightCarnivalAct1 },
+            { "stg330", SonicColors.LevelID.StarlightCarnivalAct2 },
+            { "stg340", SonicColors.LevelID.StarlightCarnivalAct3 },
+            { "stg350", SonicColors.LevelID.StarlightCarnivalAct4 },
+            { "stg320", SonicColors.LevelID.StarlightCarnivalAct5 },
+            { "stg360", SonicColors.LevelID.StarlightCarnivalAct6 },
+            { "stg390", SonicColors.LevelID.StarlightCarnivalBoss },
+            { "stg410", SonicColors.LevelID.PlanetWispAct1 },
+            { "stg440", SonicColors.LevelID.PlanetWispAct2 },
+            { "stg450", SonicColors.LevelID.PlanetWispAct3 },
+            { "stg430", SonicColors.LevelID.PlanetWispAct4 },
+            { "stg460", SonicColors.LevelID.PlanetWispAct5 },
+            { "stg420", SonicColors.LevelID.PlanetWispAct6 },
+            { "stg490", SonicColors.LevelID.PlanetWispBoss },
+            { "stg510", SonicColors.LevelID.AquariumParkAct1 },
+            { "stg540", SonicColors.LevelID.AquariumParkAct2 },
+            { "stg550", SonicColors.LevelID.AquariumParkAct3 },
+            { "stg530", SonicColors.LevelID.AquariumParkAct4 },
+            { "stg560", SonicColors.LevelID.AquariumParkAct5 },
+            { "stg520", SonicColors.LevelID.AquariumParkAct6 },
+            { "stg590", SonicColors.LevelID.AquariumParkBoss },
+            { "stg610", SonicColors.LevelID.AsteroidCoasterAct1 },
+            { "stg630", SonicColors.LevelID.AsteroidCoasterAct2 },
+            { "stg640", SonicColors.LevelID.AsteroidCoasterAct3 },
+            { "stg650", SonicColors.LevelID.AsteroidCoasterAct4 },
+            { "stg660", SonicColors.LevelID.AsteroidCoasterAct5 },
+            { "stg620", SonicColors.LevelID.AsteroidCoasterAct6 },
+            { "stg690", SonicColors.LevelID.AsteroidCoasterBoss },
+            { "stg710", SonicColors.LevelID.TerminalVelocityAct1 },
+            { "stg790", SonicColors.LevelID.TerminalVelocityBoss },
+            { "stg720", SonicColors.LevelID.TerminalVelocityAct2 },
+            { "stgD10", SonicColors.LevelID.SonicSimulatorAct1_1 },
+            { "stgB20", SonicColors.LevelID.SonicSimulatorAct1_2 },
+            { "stgE50", SonicColors.LevelID.SonicSimulatorAct1_3 },
+            { "stgD20", SonicColors.LevelID.SonicSimulatorAct2_1 },
+            { "stgB30", SonicColors.LevelID.SonicSimulatorAct2_2 },
+            { "stgF30", SonicColors.LevelID.SonicSimulatorAct2_3 },
+            { "stgG10", SonicColors.LevelID.SonicSimulatorAct3_1 },
+            { "stgG30", SonicColors.LevelID.SonicSimulatorAct3_2 },
+            { "stgA10", SonicColors.LevelID.SonicSimulatorAct3_3 },
+            { "stgD30", SonicColors.LevelID.SonicSimulatorAct4_1 },
+            { "stgG20", SonicColors.LevelID.SonicSimulatorAct4_2 },
+            { "stgC50", SonicColors.LevelID.SonicSimulatorAct4_3 },
+            { "stgE30", SonicColors.LevelID.SonicSimulatorAct5_1 },
+            { "stgB10", SonicColors.LevelID.SonicSimulatorAct5_2 },
+            { "stgE40", SonicColors.LevelID.SonicSimulatorAct5_3 },
+            { "stgG40", SonicColors.LevelID.SonicSimulatorAct6_1 },
+            { "stgC40", SonicColors.LevelID.SonicSimulatorAct6_2 },
+            { "stgF40", SonicColors.LevelID.SonicSimulatorAct6_3 },
+            { "stgA30", SonicColors.LevelID.SonicSimulatorAct7_1 },
+            { "stgE20", SonicColors.LevelID.SonicSimulatorAct7_2 },
+            { "stgC10", SonicColors.LevelID.SonicSimulatorAct7_3 }
+        };
+
+        // Watchers
+        private StringWatcher LevelID_raw { get; set; }
+        private MemoryWatcher<byte> LevelID_numeric { get; set; }
+        private MemoryWatcher<float> IGT_raw { get; set; }
+        private MemoryWatcher<byte> GoalRingReached_raw { get; set; }
+        public MemoryWatcher<byte> EggShuttle_TotalStages { get; private set; }
+        public MemoryWatcher<byte> EggShuttle_ProgressiveID { get; private set; }
+        public MemoryWatcher<byte> RunStart { get; private set; }
+        public MemoryWatcher<sbyte> TR1Rank { get; private set; }
+        public FakeMemoryWatcher<TimeSpan> IGT { get; private set; }
+        public FakeMemoryWatcher<LevelID> LevelID { get; private set; }
+        public FakeMemoryWatcher<bool> GoalRingReached { get; private set; }
+        public TimeSpan AccumulatedIGT { get;private set; } = default;
+        public GameMode CurrentGameMode { get; private set; } = GameMode.AnyPercent;
+
+        public Watchers(LiveSplitState state)
+        {
+            this.state = state;
+
+            LevelID = new FakeMemoryWatcher<LevelID>(() => LevelID_numeric.Current != 0 && ActsDict.ContainsKey(LevelID_raw.Current) ? ActsDict[LevelID_raw.Current] : SonicColors.LevelID.None);
+            GoalRingReached = new FakeMemoryWatcher<bool>(() => LevelID.Current != SonicColors.LevelID.None && GoalRingReached_raw.Current.BitCheck(5));
+            IGT = new FakeMemoryWatcher<TimeSpan>(() => LevelID.Current == SonicColors.LevelID.None ? TimeSpan.Zero : TimeSpan.FromSeconds(Math.Truncate(IGT_raw.Current * 100) / 100));
+            
+            GameProcess = new ProcessHook("SonicColorsUltimate", "Sonic Colors - Ultimate", "Dolphin");
+        }
+
+        public void Update()
+        {
+            if (Version == GameVersion.Emulator)
             {
-                game = Process.GetProcessesByName(process).OrderByDescending(x => x.StartTime).FirstOrDefault(x => !x.HasExited);
-                if (game != null) break;
+                LevelID_raw.Current = (string)emu_help["LevelID_raw"].Current ?? string.Empty; LevelID_raw.Old = (string)emu_help["LevelID_raw"].Old ?? string.Empty;
+                LevelID_numeric.Current = (byte)emu_help["LevelID_numeric"].Current; LevelID_numeric.Old = (byte)emu_help["LevelID_numeric"].Old;
+                IGT_raw.Current = (float)emu_help["IGT_raw"].Current; IGT_raw.Old = (float)emu_help["IGT_raw"].Old;
+                GoalRingReached_raw.Current = (byte)emu_help["GoalRingReached_raw"].Current; GoalRingReached_raw.Old = (byte)emu_help["GoalRingReached_raw"].Old;
+                EggShuttle_TotalStages.Current = (byte)emu_help["EggShuttle_TotalStages"].Current; EggShuttle_TotalStages.Old = (byte)emu_help["EggShuttle_TotalStages"].Old;
+                EggShuttle_ProgressiveID.Current = (byte)emu_help["EggShuttle_ProgressiveID"].Current; EggShuttle_ProgressiveID.Old = (byte)emu_help["EggShuttle_ProgressiveID"].Old;
             }
-            if (game == null) throw new Exception("Couldn't connect to the game!");
+            else
+            {
+                WatcherList.UpdateAll(game);
+            }
 
-            var scanner = new SignatureScanner(game, game.MainModule.BaseAddress, game.MainModule.ModuleMemorySize);
-            IntPtr ptr;
+            LevelID.Update();
+            GoalRingReached.Update();
+            IGT.Update();
 
-            // Basic checks
-            if (!game.Is64Bit()) throw new Exception();
-            ptr = scanner.Scan(new SigScanTarget("53 6F 6E 69 63 20 43 6F 6C 6F 72 73 3A 20 55 6C 74 69 6D 61 74 65"));   // Check if the exe is internally named "Sonic Colors: Ultimate"
-            if (ptr == IntPtr.Zero) throw new Exception();
+            if (state.CurrentPhase == TimerPhase.NotRunning)
+            {
+                if (AccumulatedIGT != TimeSpan.Zero)
+                    AccumulatedIGT = TimeSpan.Zero;
 
-            // Run start (Any% and All Chaos Emeralds)
-            // Corresponds to the "name" assigned to the internal savefile
-            // New game = "########"
-            // Otherwise = "no-name"
-            // Can be used for signalling a reset
-            ptr = scanner.Scan(new SigScanTarget(5,
-                "74 2B",                 // je "Sonic Colors - Ultimate.exe"+16F3948
-                "48 8B 0D ????????"));   // mov rcx,["Sonic Colors - Ultimate.exe"+52462A8]
-            if (ptr == IntPtr.Zero) throw new Exception();
-            this.RunStart = new MemoryWatcher<byte>(new DeepPointer(ptr + 4 + game.ReadValue<int>(ptr), 0x60, 0x120)) { FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull };
-            this.TR1rank = new MemoryWatcher<sbyte>(new DeepPointer(ptr + 4 + game.ReadValue<int>(ptr), 0x60, 0x1CC)) { FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull };  // Must be FF in a new game
+                CurrentGameMode = EggShuttle_TotalStages.Current > 0 && EggShuttle_TotalStages.Current <= 45 ? GameMode.EggShuttle : GameMode.AnyPercent;
+            }
 
-            // Current level data pointer
-            // This region of memory contains basic data about the current level you're in, such as IGT, rings, score, etc. 
-            // Also has a lot of flags (inside bitmasks) I didn't bother to investigate
-            ptr = scanner.Scan(new SigScanTarget(5,
-               "31 C0",                 // xor eax,eax
-               "48 89 05 ????????"));   // mov ["Sonic Colors - Ultimate.exe"+52465C0],rax
-            if (ptr == IntPtr.Zero) throw new Exception();
-            this.igt = new MemoryWatcher<float>(new DeepPointer(ptr + 4 + game.ReadValue<int>(ptr), 0x0, 0x270)) { FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull };
-            this.goalRingReached_byte = new MemoryWatcher<byte>(new DeepPointer(ptr + 4 + game.ReadValue<int>(ptr), 0x0, 0x110)) { FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull }; // Bit 5 gets flipped th emoment the stage is reported by the game as complete and all in-level events stop (eg. IGT stops)                                                                                                                                                                  // Level ID
-            this.levelID = new StringWatcher(new DeepPointer(ptr + 4 + game.ReadValue<int>(ptr), 0x0, 0xE0), 6); // It's a 6-character ID that uniquely reports the level you're in. The IDs are the same as in the Wii version of the game. Check Wii's actstgmission.lua for details
-            this.levelID_numeric = new MemoryWatcher<byte>(new DeepPointer(ptr + 4 + game.ReadValue<int>(ptr), 0x0, 0xE0)) { FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull };
-
-            // Egg Shuttle data pointer
-            // This memory region becomes accessible only when you're inside Egg Shuttle
-            ptr = scanner.Scan(new SigScanTarget(5,
-                "76 0C",                 // jna "Sonic Colors - Ultimate.exe"+16DF25C
-                "48 8B 0D ????????"));   // mov rcx,["Sonic colors - Ultimate.exe"+5245658]
-            if (ptr == IntPtr.Zero) throw new Exception();
-            // Egg Shuttle total levels (indicates the total number of stages included in Egg Shuttle mode)
-            this.EggShuttle_TotalStages = new MemoryWatcher<byte>(new DeepPointer(ptr + 4 + game.ReadValue<int>(ptr), 0x8, 0x38, 0x68, 0x110, 0x0)) { FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull }; // This value is always above 0 so it can be used to report whether you're in egg shuttle or not
-            this.EggShuttle_ProgressiveID = new MemoryWatcher<byte>(new DeepPointer(ptr + 4 + game.ReadValue<int>(ptr), 0x8, 0x38, 0x68, 0x110, 0xB8)) { FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull }; // Indicates level progression inside Egg Shuttle. Goes from 0 to 44 (44 = Terminal Velocity Act 2). It techically also goes to 45 at the final results screen after Terminal Velocity Act
-
-            this.AddRange(this.GetType().GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).Where(p => !p.GetIndexParameters().Any()).Select(p => p.GetValue(this, null) as MemoryWatcher).Where(p => p != null));
+            if (IGT.Old != null && IGT.Current == TimeSpan.Zero && IGT.Old != TimeSpan.Zero)
+                AccumulatedIGT += IGT.Old;
         }
 
-        public void Update() => this.UpdateAll(game);
-    }
-
-    class FakeMemoryWatcher<T>
-    {
-        public T Current { get; set; }
-        public T Old { get; set; }
-        public bool Changed { get; }
-        public FakeMemoryWatcher(T old, T current)
+        /// <summary>
+        /// This function is essentially equivalent of the init descriptor in script-based autosplitters.
+        /// Everything you want to be executed when the game gets hooked needs to be put here.
+        /// The main purpose of this function is to perform sigscanning and get memory addresses and offsets
+        /// needed by the autosplitter.
+        /// </summary>
+        private void GetAddresses()
         {
-            this.Old = old;
-            this.Current = current;
-            this.Changed = !old.Equals(current);
-        }
-    }
+            switch (game.ProcessName.ToLower())
+            {
+                default:
+                    emu_help?.Dispose();
+                    emu_help = null;
+                    Version = GameVersion.PC;
+                    IntPtr ptr = game.SigScanner().ScanOrThrow(new SigScanTarget(5, "76 0C 48 8B 0D") { OnFound = (p, _, addr) => addr + 0x4 + p.ReadValue<int>(addr) });
+                    LevelID_raw = new StringWatcher(new DeepPointer(ptr, 0x8, 0x38, 0x60, 0xE0), 6) { Current = " ", Old = " " };
+                    LevelID_numeric = new MemoryWatcher<byte>(new DeepPointer(ptr, 0x8, 0x38, 0x60, 0xE0)) { FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull, Current = 0 };
+                    IGT_raw = new MemoryWatcher<float>(new DeepPointer(ptr, 0x8, 0x38, 0x60, 0x270)) { FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull };
+                    GoalRingReached_raw = new MemoryWatcher<byte>(new DeepPointer(ptr, 0x8, 0x38, 0x60, 0x110)) { FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull };
+                    EggShuttle_TotalStages = new MemoryWatcher<byte>(new DeepPointer(ptr, 0x8, 0x38, 0x68, 0x110, 0x0)) { FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull };
+                    EggShuttle_ProgressiveID = new MemoryWatcher<byte>(new DeepPointer(ptr, 0x8, 0x38, 0x68, 0x110, 0xB8)) { FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull };
+                    RunStart = new MemoryWatcher<byte>(new DeepPointer(ptr, 0x8, 0x8, 0x10, 0x60, 0x120)) { FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull };
+                    TR1Rank = new MemoryWatcher<sbyte>(new DeepPointer(ptr, 0x8, 0x8, 0x10, 0x60, 0x1CC)) { FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull };
+                    WatcherList = new MemoryWatcherList { LevelID_raw, LevelID_numeric, IGT_raw, GoalRingReached_raw, EggShuttle_TotalStages, EggShuttle_ProgressiveID, RunStart, TR1Rank };
+                    break;
 
-    internal static class Levels
-    {
-        internal const string TropicalResortAct1 = "stg110";
-        internal const string TropicalResortAct2 = "stg130";
-        internal const string TropicalResortAct3 = "stg120";
-        internal const string TropicalResortAct4 = "stg140";
-        internal const string TropicalResortAct5 = "stg150";
-        internal const string TropicalResortAct6 = "stg160";
-        internal const string TropicalResortBoss = "stg190";
-        internal const string SweetMountainAct1 = "stg210";
-        internal const string SweetMountainAct2 = "stg230";
-        internal const string SweetMountainAct3 = "stg220";
-        internal const string SweetMountainAct4 = "stg260";
-        internal const string SweetMountainAct5 = "stg240";
-        internal const string SweetMountainAct6 = "stg250";
-        internal const string SweetMountainBoss = "stg290";
-        internal const string StarlightCarnivalAct1 = "stg310";
-        internal const string StarlightCarnivalAct2 = "stg330";
-        internal const string StarlightCarnivalAct3 = "stg340";
-        internal const string StarlightCarnivalAct4 = "stg350";
-        internal const string StarlightCarnivalAct5 = "stg320";
-        internal const string StarlightCarnivalAct6 = "stg360";
-        internal const string StarlightCarnivalBoss = "stg390";
-        internal const string PlanetWispAct1 = "stg410";
-        internal const string PlanetWispAct2 = "stg440";
-        internal const string PlanetWispAct3 = "stg450";
-        internal const string PlanetWispAct4 = "stg430";
-        internal const string PlanetWispAct5 = "stg460";
-        internal const string PlanetWispAct6 = "stg420";
-        internal const string PlanetWispBoss = "stg490";
-        internal const string AquariumParkAct1 = "stg510";
-        internal const string AquariumParkAct2 = "stg540";
-        internal const string AquariumParkAct3 = "stg550";
-        internal const string AquariumParkAct4 = "stg530";
-        internal const string AquariumParkAct5 = "stg560";
-        internal const string AquariumParkAct6 = "stg520";
-        internal const string AquariumParkBoss = "stg590";
-        internal const string AsteroidCoasterAct1 = "stg610";
-        internal const string AsteroidCoasterAct2 = "stg630";
-        internal const string AsteroidCoasterAct3 = "stg640";
-        internal const string AsteroidCoasterAct4 = "stg650";
-        internal const string AsteroidCoasterAct5 = "stg660";
-        internal const string AsteroidCoasterAct6 = "stg620";
-        internal const string AsteroidCoasterBoss = "stg690";
-        internal const string TerminalVelocityAct1 = "stg710";
-        internal const string TerminalVelocityBoss = "stg790";
-        internal const string TerminalVelocityAct2 = "stg720";
-        internal const string SonicSimulator1_1 = "stgD10";
-        internal const string SonicSimulator1_2 = "stgB20";
-        internal const string SonicSimulator1_3 = "stgE50";
-        internal const string SonicSimulator2_1 = "stgD20";
-        internal const string SonicSimulator2_2 = "stgB30";
-        internal const string SonicSimulator2_3 = "stgF30";
-        internal const string SonicSimulator3_1 = "stgG10";
-        internal const string SonicSimulator3_2 = "stgG30";
-        internal const string SonicSimulator3_3 = "stgA10";
-        internal const string SonicSimulator4_1 = "stgD30";
-        internal const string SonicSimulator4_2 = "stgG20";
-        internal const string SonicSimulator4_3 = "stgC50";
-        internal const string SonicSimulator5_1 = "stgE30";
-        internal const string SonicSimulator5_2 = "stgB10";
-        internal const string SonicSimulator5_3 = "stgE40";
-        internal const string SonicSimulator6_1 = "stgG40";
-        internal const string SonicSimulator6_2 = "stgC40";
-        internal const string SonicSimulator6_3 = "stgF40";
-        internal const string SonicSimulator7_1 = "stgA30";
-        internal const string SonicSimulator7_2 = "stgE20";
-        internal const string SonicSimulator7_3 = "stgC10";
-        internal const string None = "none";
+                case "dolphin":
+                    Version = GameVersion.Emulator;
+                    emu_help = new Wii { Gamecodes = new[] { "SNCE8P", "SNCJ8P", "SNCP8P" } };
+                    emu_help.Load = (MEM1, MEM2) => new MemoryWatcherList
+                    {
+                        new StringWatcher(new DeepPointer(MEM1 + 0xB3E0F4, 0x84), 6) { Name = "LevelID_raw" },
+                        new MemoryWatcher<byte>(new DeepPointer(MEM1 + 0xB3E0F4, 0x84)) { Name = "LevelID_numeric" },
+                        new MemoryWatcher<float>(new DeepPointer(MEM1 + 0xB3E0F4, 0x190)) { Name = "IGT_raw" },
+                        new MemoryWatcher<byte>(new DeepPointer(MEM1 + 0xB3E0F4, 0xA7)) { Name = "GoalRingReached_raw" },
+                        new MemoryWatcher<byte>(new DeepPointer(MEM1 + 0xB3E0F8, 0xE3)) { Name = "EggShuttle_TotalStages" },
+                        new MemoryWatcher<byte>(new DeepPointer(MEM1 + 0xB3E0F8, 0x19B)) { Name = "EggShuttle_ProgressiveID" },
+                    };
+                    LevelID_raw = new StringWatcher(IntPtr.Zero, 1) { Enabled = false };
+                    LevelID_numeric = new MemoryWatcher<byte>(IntPtr.Zero) { Enabled = false };
+                    IGT_raw = new MemoryWatcher<float>(IntPtr.Zero) { Enabled = false };
+                    GoalRingReached_raw = new MemoryWatcher<byte>(IntPtr.Zero) { Enabled = false };
+                    EggShuttle_TotalStages = new MemoryWatcher<byte>(IntPtr.Zero) { Enabled = false };
+                    EggShuttle_ProgressiveID = new MemoryWatcher<byte>(IntPtr.Zero) { Enabled = false };
+                    RunStart = new MemoryWatcher<byte>(IntPtr.Zero) { Enabled = false, Current = default, Old = default };
+                    TR1Rank = new MemoryWatcher<sbyte>(IntPtr.Zero) { Enabled = false, Current = default, Old = default };
+                    WatcherList = new MemoryWatcherList { RunStart, TR1Rank };
+                    break;
+            }
+        }
+
+        public void ResetVars()
+        {
+            AccumulatedIGT = default;
+        }
     }
 }

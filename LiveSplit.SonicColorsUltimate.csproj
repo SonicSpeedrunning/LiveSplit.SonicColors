@@ -9,19 +9,9 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>LiveSplit.SonicColors</RootNamespace>
     <AssemblyName>LiveSplit.SonicColors</AssemblyName>
-    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.8.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>none</DebugType>
@@ -31,6 +21,7 @@
     </DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <LangVersion>11.0</LangVersion>
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
@@ -38,6 +29,7 @@
       <HintPath>..\..\..\..\..\Program Files (x86)\LiveSplit\LiveSplit.Core.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="Microsoft.CSharp" />
     <Reference Include="System" />
     <Reference Include="System.Data" />
     <Reference Include="System.Drawing" />
@@ -50,21 +42,30 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Game\Emu-Help\Dolphin.cs" />
+    <Compile Include="Game\Emu-Help\EmuBase.cs" />
+    <Compile Include="Game\Emu-Help\Methods.cs" />
+    <Compile Include="Game\Emu-Help\Wii.cs" />
+    <Compile Include="Game\Enums.cs" />
+    <Compile Include="Game\Common\ProcessHook.cs" />
+    <Compile Include="Game\Common\Methods.cs" />
+    <Compile Include="Game\Common\GameMemoryCommon.cs" />
+    <Compile Include="Game\Common\FakeMemoryWatcher.cs" />
     <Compile Include="Game\GameMemory.cs" />
     <Compile Include="Game\SplittingLogic.cs" />
-    <Compile Include="SonicColorsComponent.cs" />
-    <Compile Include="SonicColorsFactory.cs" />
-    <Compile Include="SonicColorsSettings.cs">
+    <Compile Include="Component.cs" />
+    <Compile Include="Properties\Factory.cs" />
+    <Compile Include="Settings.cs">
       <SubType>UserControl</SubType>
     </Compile>
-    <Compile Include="SonicColorsSettings.Designer.cs">
-      <DependentUpon>SonicColorsSettings.cs</DependentUpon>
+    <Compile Include="Settings.Designer.cs">
+      <DependentUpon>Settings.cs</DependentUpon>
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="SonicColorsSettings.resx">
-      <DependentUpon>SonicColorsSettings.cs</DependentUpon>
+    <EmbeddedResource Include="Settings.resx">
+      <DependentUpon>Settings.cs</DependentUpon>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup />
