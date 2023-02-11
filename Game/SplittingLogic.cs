@@ -32,7 +32,7 @@ namespace LiveSplit.SonicColors
             {
                 case GameMode.EggShuttle:
                     if (watchers.EggShuttle_ProgressiveID.Old == watchers.EggShuttle_TotalStages.Current - 1)
-                        return CheckSplit(watchers.LevelID.Old);
+                        return settings.TerminalVelocityAct2 && watchers.GoalRingReached.Current && !watchers.GoalRingReached.Old;
                     else return CheckSplit(watchers.LevelID.Old) && watchers.EggShuttle_ProgressiveID.Current == watchers.EggShuttle_ProgressiveID.Old + 1;
                 default:
                     if (watchers.LevelID.Old == LevelID.TerminalVelocityAct2)
