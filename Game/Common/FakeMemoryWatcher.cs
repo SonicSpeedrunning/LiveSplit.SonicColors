@@ -30,16 +30,16 @@ namespace LiveSplit.SonicColors
 
     public class FakeMemoryWatcher<T> : FakeMemoryWatcher
     {
-        public new T Current { get => (T)base.Current ?? default; protected set => base.Current = value; }
-        public new T Old { get => (T)base.Old ?? default; protected set => base.Old = value; }
+        public new T Current { get => base.Current == null ? default : (T)base.Current; protected set => base.Current = value; }
+        public new T Old { get => base.Old == null ? default : (T)base.Old; protected set => base.Old = value; }
 
         /// <summary>
         /// Create a new FakeMemoryWatcher object with default values for both .Old and .Current
         /// </summary>
         public FakeMemoryWatcher()
         {
-            Current = default(T);
-            Old = default(T);
+            Current = default;
+            Old = default;
         }
 
         /// <summary>

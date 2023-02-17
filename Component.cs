@@ -40,9 +40,9 @@ namespace LiveSplit.SonicColors
             watchers.Dispose();
         }
 
-        public override XmlNode GetSettings(XmlDocument document) => this.settings.GetSettings(document);
+        public override XmlNode GetSettings(XmlDocument document) => settings.GetSettings(document);
 
-        public override Control GetSettingsControl(LayoutMode mode) => this.settings;
+        public override Control GetSettingsControl(LayoutMode mode) => settings;
 
         public override void SetSettings(XmlNode settings) => this.settings.SetSettings(settings);
 
@@ -52,13 +52,10 @@ namespace LiveSplit.SonicColors
             if (!watchers.Init()) return;
 
             // Main update logic is inside the watcher class in order to avoid exposing unneded stuff to the outside
-            if (watchers.Version == GameVersion.Emulator)
-            {
-                if (!watchers.emu_help.Update())
-                    return;
-            }
+            if (watchers.Version == GameVersion.Emulator && !watchers.emu_help.Update())
+                return;
 
-            try { watchers.Update(); } catch { return; }
+            watchers.Update();
 
             if (timer.CurrentState.CurrentPhase == TimerPhase.Running || timer.CurrentState.CurrentPhase == TimerPhase.Paused)
             {
@@ -78,7 +75,6 @@ namespace LiveSplit.SonicColors
         {
             timer.CurrentState.IsGameTimePaused = true;
             watchers.ResetVars();
-
         }
     }
 }

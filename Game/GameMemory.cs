@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Windows.Forms;
 using LiveSplit.ComponentUtil;
 using LiveSplit.Model;
 
@@ -84,50 +83,36 @@ namespace LiveSplit.SonicColors
         };
 
         // Watchers
-        private StringWatcher LevelID_raw { get; set; }
-        private MemoryWatcher<byte> LevelID_numeric { get; set; }
-        private MemoryWatcher<float> IGT_raw { get; set; }
-        private MemoryWatcher<byte> GoalRingReached_raw { get; set; }
-        public MemoryWatcher<byte> EggShuttle_TotalStages { get; private set; }
-        public MemoryWatcher<byte> EggShuttle_ProgressiveID { get; private set; }
-        public MemoryWatcher<byte> RunStart { get; private set; }
-        public MemoryWatcher<sbyte> TR1Rank { get; private set; }
-        public FakeMemoryWatcher<TimeSpan> IGT { get; private set; }
         public FakeMemoryWatcher<LevelID> LevelID { get; private set; }
+        public FakeMemoryWatcher<TimeSpan> IGT { get; private set; }
         public FakeMemoryWatcher<bool> GoalRingReached { get; private set; }
+        public FakeMemoryWatcher<byte> EggShuttle_TotalStages { get; private set; }
+        public FakeMemoryWatcher<byte> EggShuttle_ProgressiveID { get; private set; }
+        public FakeMemoryWatcher<byte> RunStart { get; private set; }
+        public FakeMemoryWatcher<sbyte> TR1Rank { get; private set; }
         public TimeSpan AccumulatedIGT { get;private set; } = default;
         public GameMode CurrentGameMode { get; private set; } = GameMode.AnyPercent;
 
         public Watchers(LiveSplitState state)
         {
             this.state = state;
-
-            LevelID = new FakeMemoryWatcher<LevelID>(() => LevelID_numeric.Current != 0 && ActsDict.ContainsKey(LevelID_raw.Current) ? ActsDict[LevelID_raw.Current] : SonicColors.LevelID.None);
-            GoalRingReached = new FakeMemoryWatcher<bool>(() => LevelID.Current != SonicColors.LevelID.None && GoalRingReached_raw.Current.BitCheck(5));
-            IGT = new FakeMemoryWatcher<TimeSpan>(() => LevelID.Current == SonicColors.LevelID.None ? TimeSpan.Zero : TimeSpan.FromSeconds(Math.Truncate(IGT_raw.Current * 100) / 100));
-            
             GameProcess = new ProcessHook("SonicColorsUltimate", "Sonic Colors - Ultimate", "Dolphin");
         }
 
         public void Update()
         {
-            if (Version == GameVersion.Emulator)
-            {
-                LevelID_raw.Current = (string)emu_help["LevelID_raw"].Current ?? string.Empty; LevelID_raw.Old = (string)emu_help["LevelID_raw"].Old ?? string.Empty;
-                LevelID_numeric.Current = (byte)emu_help["LevelID_numeric"].Current; LevelID_numeric.Old = (byte)emu_help["LevelID_numeric"].Old;
-                IGT_raw.Current = (float)emu_help["IGT_raw"].Current; IGT_raw.Old = (float)emu_help["IGT_raw"].Old;
-                GoalRingReached_raw.Current = (byte)emu_help["GoalRingReached_raw"].Current; GoalRingReached_raw.Old = (byte)emu_help["GoalRingReached_raw"].Old;
-                EggShuttle_TotalStages.Current = (byte)emu_help["EggShuttle_TotalStages"].Current; EggShuttle_TotalStages.Old = (byte)emu_help["EggShuttle_TotalStages"].Old;
-                EggShuttle_ProgressiveID.Current = (byte)emu_help["EggShuttle_ProgressiveID"].Current; EggShuttle_ProgressiveID.Old = (byte)emu_help["EggShuttle_ProgressiveID"].Old;
-            }
-            else
-            {
-                WatcherList.UpdateAll(game);
-            }
-
             LevelID.Update();
             GoalRingReached.Update();
             IGT.Update();
+            GoalRingReached.Update();
+            EggShuttle_TotalStages.Update();
+            EggShuttle_ProgressiveID.Update();
+
+            if (Version != GameVersion.Emulator)
+            {
+                RunStart.Update();
+                TR1Rank.Update();
+            }
 
             if (state.CurrentPhase == TimerPhase.NotRunning)
             {
@@ -156,15 +141,20 @@ namespace LiveSplit.SonicColors
                     emu_help = null;
                     Version = GameVersion.PC;
                     IntPtr ptr = game.SigScanner().ScanOrThrow(new SigScanTarget(5, "76 0C 48 8B 0D") { OnFound = (p, _, addr) => addr + 0x4 + p.ReadValue<int>(addr) });
-                    LevelID_raw = new StringWatcher(new DeepPointer(ptr, 0x8, 0x38, 0x60, 0xE0), 6) { Current = " ", Old = " " };
-                    LevelID_numeric = new MemoryWatcher<byte>(new DeepPointer(ptr, 0x8, 0x38, 0x60, 0xE0)) { FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull, Current = 0 };
-                    IGT_raw = new MemoryWatcher<float>(new DeepPointer(ptr, 0x8, 0x38, 0x60, 0x270)) { FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull };
-                    GoalRingReached_raw = new MemoryWatcher<byte>(new DeepPointer(ptr, 0x8, 0x38, 0x60, 0x110)) { FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull };
-                    EggShuttle_TotalStages = new MemoryWatcher<byte>(new DeepPointer(ptr, 0x8, 0x38, 0x68, 0x110, 0x0)) { FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull };
-                    EggShuttle_ProgressiveID = new MemoryWatcher<byte>(new DeepPointer(ptr, 0x8, 0x38, 0x68, 0x110, 0xB8)) { FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull };
-                    RunStart = new MemoryWatcher<byte>(new DeepPointer(ptr, 0x8, 0x8, 0x10, 0x60, 0x120)) { FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull };
-                    TR1Rank = new MemoryWatcher<sbyte>(new DeepPointer(ptr, 0x8, 0x8, 0x10, 0x60, 0x1CC)) { FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull };
-                    WatcherList = new MemoryWatcherList { LevelID_raw, LevelID_numeric, IGT_raw, GoalRingReached_raw, EggShuttle_TotalStages, EggShuttle_ProgressiveID, RunStart, TR1Rank };
+                    var levelid = new DeepPointer(ptr, 0x8, 0x38, 0x60, 0xE0);
+                    var igtraw = new DeepPointer(ptr, 0x8, 0x38, 0x60, 0x270);
+                    var grr = new DeepPointer(ptr, 0x8, 0x38, 0x60, 0x110);
+                    var eggshuttle_totalstages = new DeepPointer(ptr, 0x8, 0x38, 0x68, 0x110, 0x0);
+                    var eggshuttle_progressiveid = new DeepPointer(ptr, 0x8, 0x38, 0x68, 0x110, 0xB8);
+                    var runstart = new DeepPointer(ptr, 0x8, 0x8, 0x10, 0x60, 0x120);
+                    var tr1rank = new DeepPointer(ptr, 0x8, 0x8, 0x10, 0x60, 0x1CC);
+                    LevelID = new FakeMemoryWatcher<LevelID>(() => { if (levelid.Deref<byte>(game) == 0) { return SonicColors.LevelID.None; } else { string id = levelid.DerefString(game, 6, " "); return ActsDict.ContainsKey(id) ? ActsDict[id] : SonicColors.LevelID.None; } });
+                    IGT = new FakeMemoryWatcher<TimeSpan>(() => LevelID.Current == SonicColors.LevelID.None ? TimeSpan.Zero : TimeSpan.FromSeconds(Math.Truncate(igtraw.Deref<float>(game) * 100) / 100));
+                    GoalRingReached = new FakeMemoryWatcher<bool>(() => LevelID.Current != SonicColors.LevelID.None && grr.Deref<byte>(game).BitCheck(5));
+                    EggShuttle_TotalStages = new FakeMemoryWatcher<byte>(() => eggshuttle_totalstages.Deref<byte>(game));
+                    EggShuttle_ProgressiveID = new FakeMemoryWatcher<byte>(() => eggshuttle_progressiveid.Deref<byte>(game));
+                    RunStart = new FakeMemoryWatcher<byte>(() => runstart.Deref<byte>(game));
+                    TR1Rank = new FakeMemoryWatcher<sbyte>(() => tr1rank.Deref<sbyte>(game));
                     break;
 
                 case "dolphin":
@@ -179,15 +169,13 @@ namespace LiveSplit.SonicColors
                         new MemoryWatcher<byte>(new DeepPointer(MEM1 + 0xB3E0F8, 0xE3)) { Name = "EggShuttle_TotalStages" },
                         new MemoryWatcher<byte>(new DeepPointer(MEM1 + 0xB3E0F8, 0x19B)) { Name = "EggShuttle_ProgressiveID" },
                     };
-                    LevelID_raw = new StringWatcher(IntPtr.Zero, 1) { Enabled = false };
-                    LevelID_numeric = new MemoryWatcher<byte>(IntPtr.Zero) { Enabled = false };
-                    IGT_raw = new MemoryWatcher<float>(IntPtr.Zero) { Enabled = false };
-                    GoalRingReached_raw = new MemoryWatcher<byte>(IntPtr.Zero) { Enabled = false };
-                    EggShuttle_TotalStages = new MemoryWatcher<byte>(IntPtr.Zero) { Enabled = false };
-                    EggShuttle_ProgressiveID = new MemoryWatcher<byte>(IntPtr.Zero) { Enabled = false };
-                    RunStart = new MemoryWatcher<byte>(IntPtr.Zero) { Enabled = false, Current = default, Old = default };
-                    TR1Rank = new MemoryWatcher<sbyte>(IntPtr.Zero) { Enabled = false, Current = default, Old = default };
-                    WatcherList = new MemoryWatcherList { RunStart, TR1Rank };
+                    LevelID = new FakeMemoryWatcher<LevelID>(() => { if (emu_help["LevelID_numeric"].Current == null || (byte)emu_help["LevelID_numeric"].Current == 0) { return SonicColors.LevelID.None; } else { string id = (string)emu_help["LevelID_raw"].Current; return ActsDict.ContainsKey(id) ? ActsDict[id] : SonicColors.LevelID.None; } });
+                    IGT = new FakeMemoryWatcher<TimeSpan>(() => LevelID.Current == SonicColors.LevelID.None ? TimeSpan.Zero : TimeSpan.FromSeconds(Math.Truncate((float)emu_help["IGT_raw"].Current * 100) / 100));
+                    GoalRingReached = new FakeMemoryWatcher<bool>(() => LevelID.Current != SonicColors.LevelID.None && ((byte)emu_help["GoalRingReached_raw"].Current).BitCheck(5));
+                    EggShuttle_TotalStages = new FakeMemoryWatcher<byte>(() => (byte)emu_help["EggShuttle_TotalStages"].Current);
+                    EggShuttle_ProgressiveID = new FakeMemoryWatcher<byte>(() => (byte)emu_help["EggShuttle_ProgressiveID"].Current);
+                    RunStart = new FakeMemoryWatcher<byte>();
+                    TR1Rank = new FakeMemoryWatcher<sbyte>();
                     break;
             }
         }

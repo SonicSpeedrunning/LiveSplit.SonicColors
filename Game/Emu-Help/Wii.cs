@@ -38,17 +38,10 @@ namespace LiveSplit.SonicColors
                 return false;
             }
 
-            try
-            {
-                Watchers.UpdateAll();
+            Watchers.UpdateAll();
 
-                if (Endianess == Endianess.BigEndian)
-                    LittleEndianWatchers.UpdateAll();
-            }
-            catch
-            {
-                return false;
-            }
+            if (Endianess == Endianess.BigEndian)
+                LittleEndianWatchers.UpdateAll();
 
             return true;
         }
