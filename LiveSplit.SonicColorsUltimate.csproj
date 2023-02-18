@@ -17,8 +17,7 @@
     <DebugType>none</DebugType>
     <Optimize>true</Optimize>
     <OutputPath>Components\</OutputPath>
-    <DefineConstants>
-    </DefineConstants>
+    <DefineConstants>DEBUG</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <LangVersion>11.0</LangVersion>
